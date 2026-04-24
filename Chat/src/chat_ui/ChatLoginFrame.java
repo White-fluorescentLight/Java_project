@@ -5,6 +5,10 @@ import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.DataOutputStream;
+import java.net.Socket;
+import java.util.Date;
+
 /**
  * 局域网聊天系统 - 登录界面
  * 纯原生Swing实现
@@ -16,6 +20,7 @@ public class ChatLoginFrame extends JFrame {
     private JTextField nicknameField;
     private JButton enterBtn;
     private JButton cancelBtn;
+    private Socket socket; // 记住当前客户端通信管道
 
     public ChatLoginFrame() {
         // 初始化窗口
@@ -30,7 +35,7 @@ public class ChatLoginFrame extends JFrame {
      * 窗口基础配置（原生Swing默认样式优化）
      */
     private void initWindow() {
-        setTitle("局域网聊天室");
+        setTitle("耀闪局域网聊天室");
         setSize(400, 260);
         setLocationRelativeTo(null); // 窗口居中
         setResizable(false); // 禁止缩放
@@ -124,16 +129,33 @@ public class ChatLoginFrame extends JFrame {
                     JOptionPane.showMessageDialog(null, "昵称不能为空！", "提示", JOptionPane.WARNING_MESSAGE);
                     return;
                 }
-                // 登录成功：这里可以写进入聊天主界面的逻辑
-                JOptionPane.showMessageDialog(null, "欢迎，" + nickname + "！", "登录成功", JOptionPane.INFORMATION_MESSAGE);
+                try {
+                    // 登录成功：这里可以写进入聊天主界面的逻辑
+                    JOptionPane.showMessageDialog(null, "欢迎，" + nickname + "！", "登录成功", JOptionPane.INFORMATION_MESSAGE);
+                    // 登录方法
+                    login(nickname);
+                    // 进入聊天室逻辑：启动聊天界面
+                    new ClientChatFrame(nickname, socket).setVisible(true);
+                    dispose(); // 关闭登录界面
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
             }
         });
 
         // 取消按钮：退出程序
         cancelBtn.addActionListener(e -> System.exit(0));
     }
-    public static void main(String[] args) {
-        new ChatLoginFrame().setVisible(true);
+
+    public void login(String nickname) throws Exception{
+        // 立即发送登录消息给服务器
+        // 创建Socket管道请求与服务端socket连接
+        this.socket = new Socket(Constant.SERVER_IP,Constant.SERVER_PORT);
+        // 立即发送登录消息类型1 和自己的昵称给服务端
+        DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+        dos.writeInt(1); // 登录 消息类型
+        dos.writeUTF(nickname);
+        dos.flush();
     }
 
 }

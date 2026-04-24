@@ -5,6 +5,10 @@ import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
+import java.util.Collection;
 
 /**
  * 局域网群聊主界面
@@ -18,23 +22,42 @@ public class ClientChatFrame extends JFrame {
     private JButton sendBtn;             // 发送按钮
     private JList<String> onlineUserList;// 在线人数列表
     private DefaultListModel<String> onlineUserModel; // 在线人数数据模型
+    private Socket socket;
+    private DataOutputStream dos;
 
     // 构造方法（接收登录昵称）
-    public ClientChatFrame(String nickname) {
+    public ClientChatFrame() {
         // 初始化窗口
-        initFrame(nickname);
+        initFrame();
         // 初始化组件与布局
         initComponents();
         // 初始化事件
         initEvents();
     }
+    public ClientChatFrame(String nickname, Socket socket) {
+        this(); // 调上面的构造器，初始化界面信息
+        // 初始化数据
+        // 立马展示昵称到窗口
+        setTitle("局域网群聊 - " + nickname);
+        this.socket = socket;
+
+        try {
+            // 获取输出流，用于发送消息
+            dos = new DataOutputStream(socket.getOutputStream());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // 立即把客户端的这个Socket管道交给一个独立的线程专门负责读取客户端socket从服务端收到的在线人数更新数据或群聊数据
+        new ClientReaderThread(socket, this).start();
+    }
 
     /**
      * 窗口基础配置
      */
-    private void initFrame(String nickname) {
-        setTitle("局域网群聊 - " + nickname);
-        setSize(800, 600); // 适配聊天界面的尺寸
+    private void initFrame() {
+        setTitle("局域网群聊 - ");
+        setSize(950, 650); // 设置合理的窗口大小
         setLocationRelativeTo(null); // 窗口居中
         setResizable(true); // 允许调整窗口大小
         setDefaultCloseOperation(EXIT_ON_CLOSE); // 点击关闭按钮，退出程序
@@ -45,13 +68,13 @@ public class ClientChatFrame extends JFrame {
      * 组件布局（核心：分区域设计）
      */
     private void initComponents() {
-        // 1. 主面板：边界布局（北=消息区，南=输入区，东=在线人数区）
+        // 1. 主面板：边界布局（中=消息区，东=在线人数区，南=输入区）
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBackground(Color.WHITE);
         mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
         setContentPane(mainPanel);
 
-        // ---------------------- 顶部：消息展示框 ----------------------
+        // ---------------------- 中间：消息展示框 ----------------------
         msgDisplayArea = new JTextArea();
         msgDisplayArea.setFont(new Font("微软雅黑", Font.PLAIN, 14));
         msgDisplayArea.setEditable(false); // 禁止编辑
@@ -63,36 +86,12 @@ public class ClientChatFrame extends JFrame {
         JScrollPane msgScroll = new JScrollPane(msgDisplayArea);
         msgScroll.setBorder(null);
         msgScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
-        mainPanel.add(msgScroll, BorderLayout.NORTH);
-
-        // ---------------------- 底部：消息输入+发送按钮 ----------------------
-        JPanel inputPanel = new JPanel(new BorderLayout(8, 0));
-        inputPanel.setBackground(Color.WHITE);
-
-        // 消息输入框
-        msgInputField = new JTextField();
-        msgInputField.setFont(new Font("微软雅黑", Font.PLAIN, 14));
-        msgInputField.setPreferredSize(new Dimension(0, 35));
-        msgInputField.setBorder(new LineBorder(new Color(200, 200, 200), 1, true));
-        msgInputField.setToolTipText("输入消息后按回车或点击发送");
-        inputPanel.add(msgInputField, BorderLayout.CENTER);
-
-        // 发送按钮
-        sendBtn = new JButton("发送");
-        sendBtn.setFont(new Font("微软雅黑", Font.BOLD, 14));
-        sendBtn.setPreferredSize(new Dimension(80, 35));
-        sendBtn.setBackground(new Color(219, 112, 147)); // 主题蓝
-        sendBtn.setForeground(Color.WHITE);
-        sendBtn.setFocusPainted(false);
-        sendBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        inputPanel.add(sendBtn, BorderLayout.EAST);
-
-        mainPanel.add(inputPanel, BorderLayout.SOUTH);
+        mainPanel.add(msgScroll, BorderLayout.CENTER);
 
         // ---------------------- 右侧：在线人数展示框 ----------------------
         JPanel onlinePanel = new JPanel(new BorderLayout(5, 5));
         onlinePanel.setBackground(Color.WHITE);
-        onlinePanel.setPreferredSize(new Dimension(180, 0)); // 固定宽度
+        onlinePanel.setPreferredSize(new Dimension(150, 0)); // 固定宽度150像素
 
         // 在线人数标题
         JLabel onlineTitle = new JLabel(" 在线人数", SwingConstants.LEFT);
@@ -113,6 +112,30 @@ public class ClientChatFrame extends JFrame {
         onlinePanel.add(onlineScroll, BorderLayout.CENTER);
 
         mainPanel.add(onlinePanel, BorderLayout.EAST);
+
+        // ---------------------- 底部：消息输入+发送按钮 ----------------------
+        JPanel inputPanel = new JPanel(new BorderLayout(8, 0));
+        inputPanel.setBackground(Color.WHITE);
+        inputPanel.setPreferredSize(new Dimension(0, 45)); // 设置输入区域高度
+
+        // 消息输入框
+        msgInputField = new JTextField();
+        msgInputField.setFont(new Font("微软雅黑", Font.PLAIN, 14));
+        msgInputField.setBorder(new LineBorder(new Color(200, 200, 200), 1, true));
+        msgInputField.setToolTipText("输入消息后按回车或点击发送");
+        inputPanel.add(msgInputField, BorderLayout.CENTER);
+
+        // 发送按钮
+        sendBtn = new JButton("发送");
+        sendBtn.setFont(new Font("微软雅黑", Font.BOLD, 14));
+        sendBtn.setPreferredSize(new Dimension(80, 35));
+        sendBtn.setBackground(new Color(219, 112, 147)); // 主题蓝
+        sendBtn.setForeground(Color.WHITE);
+        sendBtn.setFocusPainted(false);
+        sendBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        inputPanel.add(sendBtn, BorderLayout.EAST);
+
+        mainPanel.add(inputPanel, BorderLayout.SOUTH);
     }
 
     /**
@@ -134,6 +157,42 @@ public class ClientChatFrame extends JFrame {
                 sendMessage();
             }
         });
+
+    }
+
+    // 发送消息给服务端
+    private void sendMsgToServer(String msg) {
+        try {
+            // 1.把消息类型发送给服务端（2代表群聊消息）
+            dos.writeInt(2);
+            // 2.把消息内容发送给服务端
+            dos.writeUTF(msg);
+            dos.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // 更新在线人数
+    public void updataClientOnlinetUsers(String[] onlinenames) {
+        // 确保在事件调度线程中更新UI
+        SwingUtilities.invokeLater(() -> {
+            // 把线程读取到的在线用户昵称展示到界面上
+            onlineUserList.setListData(onlinenames);
+        });
+    }
+
+    // 更新群聊消息
+    public void setMsgToWin(String msg){
+        // 确保在事件调度线程中更新UI
+        SwingUtilities.invokeLater(() -> {
+            // 将\r\n替换为\n，确保换行正确显示
+            String formattedMsg = msg.replace("\r\n", "\n");
+            // 更新群聊消息到界面展示
+            msgDisplayArea.append(formattedMsg + "\n");
+            // 滚动到最新消息
+            msgDisplayArea.setCaretPosition(msgDisplayArea.getText().length());
+        });
     }
 
     /**
@@ -145,25 +204,10 @@ public class ClientChatFrame extends JFrame {
             JOptionPane.showMessageDialog(null, "消息不能为空！", "提示", JOptionPane.WARNING_MESSAGE);
             return;
         }
-
-        // 模拟显示消息（实际项目中替换为局域网发送逻辑）
-        String showMsg = "我：" + msg + "\n";
-        msgDisplayArea.append(showMsg);
-        // 滚动到最新消息
-        msgDisplayArea.setCaretPosition(msgDisplayArea.getText().length());
+        // 发送消息给服务端
+        sendMsgToServer(msg);
         // 清空输入框
         msgInputField.setText("");
     }
 
-    /**
-     * 测试入口（实际项目中从登录界面跳转）
-     */
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new ClientChatFrame("测试用户").setVisible(true);
-            }
-        });
-    }
 }
