@@ -1,0 +1,41 @@
+#server:
+#  port: ****
+
+spring:
+  application:
+    name: tlias-web-management
+
+#  # 数据库连接信息配置
+#  datasource:
+#    url: jdbc:mysql://********:********/
+#    driver-class-name: com.mysql.cj.jdbc.Driver
+#    username: ******
+#    password: ******
+
+  # 文件上传配置
+  servlet:
+    multipart:
+      # 最大单个文件大小
+      max-file-size: 10MB
+      # 最大请求大小（包含所有文件和表单数据）
+      max-request-size: 100MB
+
+# MyBatis 相关配置
+mybatis:
+  configuration:
+    # 开启 SQL 日志输出
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 开启数据库下划线命名到 Java 驼峰命名的自动映射
+    map-underscore-to-camel-case: true
+
+# 阿里云 OSS 配置
+aliyun:
+  oss:
+    endpoint: https://oss-cn-beijing.aliyuncs.com
+    bucket-name: java-web01-light
+    region: cn-beijing
+
+# 事务管理日志级别配置
+logging:
+  level:
+    org.springframework.jdbc.support.JdbcTransactionManager: debug
