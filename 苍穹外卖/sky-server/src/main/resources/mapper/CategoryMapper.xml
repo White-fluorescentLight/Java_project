@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="com.sky.mapper.CategoryMapper">
-
+    <!-- 分页查询菜品分类 -->
     <select id="pageQuery" resultType="com.sky.entity.Category">
         select * from category
         <where>
@@ -15,8 +15,8 @@
         </where>
         order by sort asc , create_time desc
     </select>
-
-    <update id="update" parameterType="Category">
+    <!-- 修改菜品分类数据 -->
+    <update id="update" parameterType="com.sky.entity.Category">
         update category
         <set>
             <if test="type != null">
@@ -40,8 +40,8 @@
         </set>
         where id = #{id}
     </update>
-
-    <select id="list" resultType="Category">
+    <!-- 查询菜品分类列表 -->
+    <select id="list" resultType="com.sky.entity.Category">
         select * from category
         where status = 1
         <if test="type != null">
